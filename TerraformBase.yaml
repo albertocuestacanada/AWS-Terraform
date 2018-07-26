@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: 'This template creates the basic network infrastructure for the Terraform development environment. It creates a VPC with two public subnets in different availability zones, in the eu-west-1 (Ireland) region.'
+
+Outputs:
+
+  # --- Networks ---
+  TerraformEC2VPCOut:
+    Description: The Development VPC for Terraform infrastructure.
+    Value: !Ref EC2VPC
+    Export:
+      Name: TerraformEC2VPCOut
+
+  TerraformEC2Subnet1Out:
+    Description: A development subnet in the eu-west-1a region and zone.
+    Value: !Ref EC2Subnet1
+    Export:
+      Name: TerraformEC2Subnet1Out
+
+  TerraformEC2Subnet2Out:
+    Description: A development subnet in the eu-west-1b region and zone.
+    Value: !Ref EC2Subnet2
+    Export:
+      Name: TerraformEC2Subnet2Out
+
+  # --- Security Groups ---
+  # EC2 Instances require the Security Group Id instead of the Security Group Resource
+  TerraformEC2SecurityGroupSSHGroupIdOut:
+    Description: This Security Group allows SSH traffic on port 22.
+    Value:
+      Fn::GetAtt:
+        - EC2SecurityGroupSSH
+        - GroupId
+    Export:
+      Name: TerraformEC2SecurityGroupSSHGroupIdOut
+
+  # EC2 Instances require the Security Group Id instead of the Security Group Resource
+  TerraformEC2SecurityGroupHTTPGroupIdOut:
+    Description: This Security Group allows HTTP traffic on port 80.
+    Value:
+      Fn::GetAtt:
+        - EC2SecurityGroupHTTP
+        - GroupId
+    Export:
+      Name: TerraformEC2SecurityGroupHTTPGroupIdOut
+
+Resources:
+
+  # --- Networks ---
+  EC2VPC:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc.html
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 192.168.0.0/16
+
+  EC2Subnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: 192.168.0.0/24
+      AvailabilityZone: "eu-west-1a"
+      MapPublicIpOnLaunch: true
+
+  EC2Subnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref EC2VPC
+      CidrBlock: 192.168.1.0/24
+      AvailabilityZone: "eu-west-1b"
+      MapPublicIpOnLaunch: true
+
+  EC2InternetGateway:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-internetgateway.html
+    Type: "AWS::EC2::InternetGateway"
+    Properties: {}
+
+  EC2VPCGatewayAttachment:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-vpc-gateway-attachment.html
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties: 
+      InternetGatewayId: !Ref EC2InternetGateway
+      VpcId: !Ref EC2VPC
+
+  EC2RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties: 
+      VpcId: !Ref EC2VPC
+
+  EC2InternetRoute:
+    Type: "AWS::EC2::Route"
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref EC2InternetGateway
+      RouteTableId: !Ref EC2RouteTable
+
+  EC2SubnetRouteTableAssociation1:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      RouteTableId: !Ref EC2RouteTable
+      SubnetId: !Ref EC2Subnet1
+
+  EC2SubnetRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties: 
+      RouteTableId: !Ref EC2RouteTable
+      SubnetId: !Ref EC2Subnet2
+
+  # --- Security Groups ---
+  EC2SecurityGroupSSH:
+    # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref EC2VPC
+      GroupDescription: Open SSH traffic on port 22 from all IPs. Harden for real life, please.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+
+  EC2SecurityGroupHTTP:
+    # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-security-group.html
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref EC2VPC
+      GroupDescription: Open HTTP traffic on port 80 from all IPs.
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0

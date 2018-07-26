@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+    'This template instantiates an ubuntu-based EC2 instance to be used as a Terraform server.'
+
+Parameters:
+  KeyNameParam:
+    Description: EC2 Instance SSH Key
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+Resources:
+
+  EC2Instance:
+  # https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-properties-ec2-instance.html
+  # Attaching IAM roles to EC2 -> https://hackernoon.com/attach-an-iam-role-to-an-ec2-instance-with-cloudformation-33c517a8d4c3
+  # Use ami-2a7d75c0 for a fresh ubuntu install
+    Type: "AWS::EC2::Instance"
+    Properties: 
+      ImageId: ami-2a7d75c0
+      InstanceType: t2.micro
+      KeyName: !Ref KeyNameParam
+      SecurityGroupIds: 
+        - !ImportValue TerraformEC2SecurityGroupSSHGroupIdOut
+        - !ImportValue TerraformEC2SecurityGroupHTTPGroupIdOut
+      SubnetId: !ImportValue TerraformEC2Subnet1Out
+      Tags:
+        - Key: Name
+          Value: TerraformServer
+      UserData:
+        "Fn::Base64":
+          !Sub |
+            #!/bin/bash
+            apt-get install language-pack-pt -y
+            apt-get update
+            apt-get upgrade -y
+            apt-get install git unzip awscli -y
+            wget https://releases.hashicorp.com/terraform/0.11.7/terraform_0.11.7_linux_amd64.zip            
+            unzip terraform_0.11.7_linux_amd64.zip
+            mv terraform /usr/local/bin/
